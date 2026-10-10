@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi Planificación Semanal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="nav">
+      <button id="prevWeek" title="Semana anterior" aria-label="Semana anterior">‹</button>
+      <button id="today">Hoy</button>
+      <button id="nextWeek" title="Semana siguiente" aria-label="Semana siguiente">›</button>
+      <h1 id="weekLabel"></h1>
+    </div>
+    <div class="actions">
+      <button id="addBtn" class="primary">+ Actividad</button>
+      <button id="copyPrev" title="Copia las actividades 'solo esa semana' de la semana anterior">Copiar semana anterior</button>
+      <details class="more">
+        <summary>Más</summary>
+        <div class="menu">
+          <label>Hora inicial
+            <select id="startHour"></select>
+          </label>
+          <label>Hora final
+            <select id="endHour"></select>
+          </label>
+          <button id="exportBtn">Exportar copia (JSON)</button>
+          <button id="importBtn">Importar copia</button>
+          <button id="printBtn">Imprimir</button>
+          <input type="file" id="importFile" accept="application/json" hidden>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span><i class="tag fixed"></i> Fija (todas las semanas)</span>
+    <span><i class="tag once"></i> Solo esta semana</span>
+    <span class="hint">Clic en una celda vacía para añadir · clic en una actividad para editar</span>
+  </div>
+
+  <main>
+    <div id="schedule" class="schedule"></div>
+  </main>
+
+  <dialog id="dlg">
+    <form method="dialog" id="form">
+      <h2 id="dlgTitle">Nueva actividad</h2>
+
+      <label>Nombre
+        <input id="fTitle" required maxlength="60" placeholder="Ej: Gimnasio, Estudiar, Reunión…" autocomplete="off">
+      </label>
+
+      <fieldset>
+        <legend>Tipo</legend>
+        <label class="radio"><input type="radio" name="kind" value="fixed" checked> Fija: se repite todas las semanas</label>
+        <label class="radio"><input type="radio" name="kind" value="once"> Solo esta semana (<span id="kindWeek"></span>)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Días</legend>
+        <div id="fDays" class="days"></div>
+      </fieldset>
+
+      <div class="row">
+        <label>Inicio <input type="time" id="fStart" step="900" required></label>
+        <label>Fin <input type="time" id="fEnd" step="900" required></label>
+      </div>
+
+      <fieldset>
+        <legend>Color</legend>
+        <div id="fColors" class="colors"></div>
+      </fieldset>
+
+      <label>Notas (opcional)
+        <textarea id="fNotes" rows="2" maxlength="300"></textarea>
+      </label>
+
+      <p id="fError" class="error" hidden></p>
+
+      <div class="dlg-actions">
+        <button type="button" id="delWeek" class="danger" hidden>Quitar solo esta semana</button>
+        <button type="button" id="delAll" class="danger" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" id="cancel">Cancelar</button>
+        <button type="submit" class="primary">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
