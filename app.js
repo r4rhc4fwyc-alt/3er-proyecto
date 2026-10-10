@@ -149,8 +149,8 @@ function render() {
     col.addEventListener("click", e => {
       if (e.target !== col) return;
       const y = e.offsetY;
-      const mins = Math.floor((y / HOUR_H) * 2) * 30 + startMin; // ajusta a 30 min
-      openDialog({ days: [i], start: mins, end: Math.min(mins + 60, 1440) });
+      const mins = Math.round((y / HOUR_H) * 4) * 15 + startMin; // ajusta a 15 min
+      openDialog({ days: [i], start: mins, end: Math.min(mins + 30, 1440) });
     });
 
     const items = activitiesFor(currentMonday, i)
@@ -159,17 +159,23 @@ function render() {
 
     layout(items).forEach(it => {
       const { a } = it;
+      const durMin = a.end - a.start;
+      const compact = durMin < 30; // actividades cortas: todo en una línea
       const el = document.createElement("div");
-      el.className = "event " + a.kind;
+      el.className = "event " + a.kind + (compact ? " compact" : "");
       el.style.background = a.color;
       el.style.top = ((it.start - startMin) / 60) * HOUR_H + "px";
-      el.style.height = Math.max(((it.end - it.start) / 60) * HOUR_H - 2, 18) + "px";
+      el.style.height = Math.max(((it.end - it.start) / 60) * HOUR_H - 2, 16) + "px";
       el.style.left = `calc(${(it.lane / it.lanes) * 100}% + 2px)`;
       el.style.width = `calc(${100 / it.lanes}% - 4px)`;
       el.title = `${a.title}\n${fmtMin(a.start)} – ${fmtMin(a.end)}${a.notes ? "\n" + a.notes : ""}`;
-      el.innerHTML = `<div class="t"></div><div class="h">${fmtMin(a.start)} – ${fmtMin(a.end)}</div>${a.notes ? '<div class="n"></div>' : ""}`;
+      if (compact) {
+        el.innerHTML = `<span class="t"></span> <span class="h">${fmtMin(a.start)}</span>`;
+      } else {
+        el.innerHTML = `<div class="t"></div><div class="h">${fmtMin(a.start)} – ${fmtMin(a.end)}</div>${a.notes ? '<div class="n"></div>' : ""}`;
+        if (a.notes) el.querySelector(".n").textContent = a.notes;
+      }
       el.querySelector(".t").textContent = a.title;
-      if (a.notes) el.querySelector(".n").textContent = a.notes;
       el.addEventListener("click", () => openDialog(a));
       col.appendChild(el);
     });

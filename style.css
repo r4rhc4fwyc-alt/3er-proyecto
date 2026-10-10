@@ -151,6 +151,14 @@ main { padding: 0 16px 24px; overflow-x: auto; }
 .event.once {
   background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 6px, transparent 6px 12px);
 }
+.event.compact {
+  padding: 1px 6px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.event.compact .t { font-weight: 600; }
+.event.compact .h { opacity: .7; font-size: 10px; }
 
 /* ---------- Diálogo ---------- */
 dialog {
