@@ -160,6 +160,16 @@ main { padding: 0 16px 24px; overflow-x: auto; }
 .event.compact .t { font-weight: 600; }
 .event.compact .h { opacity: .7; font-size: 10px; }
 
+.chain {
+  position: absolute; right: 3px; bottom: 2px;
+  font-size: 10px; font-weight: 600;
+  background: rgba(0,0,0,.18); color: #15306b;
+  border-radius: 999px; padding: 0 5px; line-height: 15px;
+  white-space: nowrap;
+}
+.event.compact .chain { position: static; margin-left: 4px; }
+.chain.all-done { background: #1f9d57; color: #fff; }
+
 /* ---------- Diálogo ---------- */
 dialog {
   border: 1px solid var(--line-strong);
@@ -208,6 +218,75 @@ dialog legend { font-weight: 500; margin-bottom: 4px; padding: 0; }
 
 @media (max-width: 700px) {
   .legend .hint { display: none; }
+}
+
+/* ---------- Mini-menú de actividad ---------- */
+.event-menu {
+  position: fixed; z-index: 50;
+  background: var(--panel); border: 1px solid var(--line-strong);
+  border-radius: 10px; padding: 6px; min-width: 210px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.event-menu button {
+  display: flex; align-items: center; gap: 10px;
+  border: 0; background: none; text-align: left;
+  padding: 9px 10px; border-radius: 7px; width: 100%;
+}
+.event-menu button:hover { background: var(--today); }
+.event-menu .ico { width: 18px; text-align: center; }
+.event-menu .count { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* ---------- Panel de hábitos encadenados ---------- */
+.stack-head { margin-bottom: 10px; }
+.stack-head h2 { margin: 0; font-size: 18px; }
+.stack-date { margin: 2px 0 0; color: var(--muted); text-transform: capitalize; }
+
+.stack-progress { margin-bottom: 12px; }
+.stack-progress .bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.stack-progress .bar #stackBar {
+  height: 100%; width: 0; background: #1f9d57; border-radius: 999px;
+  transition: width .2s ease;
+}
+.stack-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 13px; }
+.stack-meta #stackStreak { color: #e07b2e; font-weight: 600; }
+.dur-label { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+
+.stack-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.stack-list .empty { color: var(--muted); margin: 4px 0; }
+.stack-list .anchor { margin: 0 0 4px; font-size: 13px; color: var(--muted); font-style: italic; }
+
+.habit {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--bg);
+}
+.habit.done { opacity: .62; }
+.habit.done .hname { text-decoration: line-through; }
+.habit .hdone { width: 18px; height: 18px; flex: 0 0 auto; cursor: pointer; }
+.habit .hnum {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--line); color: var(--muted);
+  font-size: 11px; display: grid; place-items: center;
+}
+.habit .hname { flex: 1; word-break: break-word; }
+.habit .hmove { display: flex; gap: 2px; }
+.habit .hmove button, .habit .hdel {
+  border: 1px solid var(--line-strong); background: var(--panel);
+  border-radius: 6px; padding: 2px 7px; line-height: 1.2;
+}
+.habit .hmove button:disabled { opacity: .35; cursor: default; }
+.habit .hdel { color: var(--danger); border-color: var(--line-strong); }
+
+.stack-add { display: flex; gap: 8px; margin-bottom: 12px; }
+.stack-add input {
+  flex: 1; border: 1px solid var(--line-strong); border-radius: 6px;
+  padding: 7px 9px; background: var(--bg); color: inherit;
+}
+.dur-input { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; font-weight: 500; }
+.dur-input input {
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 7px 9px;
+  background: var(--bg); color: inherit; width: 120px;
 }
 
 @media print {

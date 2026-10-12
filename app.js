@@ -13,7 +13,8 @@ let currentMonday = mondayOf(new Date());
 let editingId = null;
 
 function defaultState() {
-  return { startHour: 6, endHour: 24, activities: [] };
+  // done: { "YYYY-MM-DD": { habitId: true } }  -> hábitos marcados por fecha
+  return { startHour: 6, endHour: 24, activities: [], done: {} };
 }
 
 function load() {
@@ -53,10 +54,57 @@ function parseTime(s, isEnd) {
   const v = h * 60 + m;
   return isEnd && v === 0 ? 1440 : v; // "00:00" como fin = medianoche
 }
+function parseISO(s) {
+  return new Date(s + "T00:00");
+}
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 const $ = id => document.getElementById(id);
+
+/* ====== Hábitos encadenados (habit stacking) ====== */
+// ¿La actividad "a" ocurre en esta fecha concreta?
+function occursOn(a, date) {
+  const dayIdx = (date.getDay() + 6) % 7; // 0 = lunes
+  if (!a.days.includes(dayIdx)) return false;
+  const key = iso(mondayOf(date));
+  if (a.kind === "once") return a.weekStart === key;
+  return !(a.skipWeeks || []).includes(key);
+}
+// Hábitos marcados como hechos en esa fecha (solo los que siguen en la cadena)
+function doneCount(a, dateKey) {
+  const map = state.done[dateKey] || {};
+  return (a.stack || []).filter(h => map[h.id]).length;
+}
+function isDone(a, dateKey, habitId) {
+  return !!(state.done[dateKey] && state.done[dateKey][habitId]);
+}
+function toggleDone(dateKey, habitId, value) {
+  if (!state.done[dateKey]) state.done[dateKey] = {};
+  if (value) state.done[dateKey][habitId] = true;
+  else delete state.done[dateKey][habitId];
+  if (!Object.keys(state.done[dateKey]).length) delete state.done[dateKey];
+  save();
+}
+// Racha: días consecutivos (solo los que toca la rutina) con la cadena completa.
+// Un "hoy" aún incompleto no rompe la racha, simplemente no suma todavía.
+function streakFor(a, uptoKey) {
+  const total = (a.stack || []).length;
+  if (!total) return 0;
+  let streak = 0, walked = 0, first = true;
+  const todayKey = iso(new Date());
+  let d = parseISO(uptoKey);
+  while (walked++ < 400) {
+    if (occursOn(a, d)) {
+      const complete = doneCount(a, iso(d)) === total;
+      if (complete) streak++;
+      else if (!(first && iso(d) === todayKey)) break; // hoy en curso: no penaliza
+      first = false;
+    }
+    d = addDays(d, -1);
+  }
+  return streak;
+}
 
 /* ====== Actividades visibles en una semana ====== */
 function activitiesFor(monday, dayIdx) {
@@ -157,10 +205,17 @@ function render() {
       .map(a => ({ a, start: Math.max(a.start, startMin), end: Math.min(a.end, endMin) }))
       .filter(x => x.end > x.start);
 
+    const dateKey = iso(d);
     layout(items).forEach(it => {
       const { a } = it;
       const durMin = a.end - a.start;
       const compact = durMin < 30; // actividades cortas: todo en una línea
+      const nHabits = (a.stack || []).length;
+      const nDone = nHabits ? doneCount(a, dateKey) : 0;
+      const allDone = nHabits && nDone === nHabits;
+      const badge = nHabits
+        ? `<span class="chain${allDone ? " all-done" : ""}">${allDone ? "✓" : "⛓"} ${nDone}/${nHabits}</span>`
+        : "";
       const el = document.createElement("div");
       el.className = "event " + a.kind + (compact ? " compact" : "");
       el.style.background = a.color;
@@ -170,13 +225,13 @@ function render() {
       el.style.width = `calc(${100 / it.lanes}% - 4px)`;
       el.title = `${a.title}\n${fmtMin(a.start)} – ${fmtMin(a.end)}${a.notes ? "\n" + a.notes : ""}`;
       if (compact) {
-        el.innerHTML = `<span class="t"></span> <span class="h">${fmtMin(a.start)}</span>`;
+        el.innerHTML = `<span class="t"></span> <span class="h">${fmtMin(a.start)}</span>${badge}`;
       } else {
-        el.innerHTML = `<div class="t"></div><div class="h">${fmtMin(a.start)} – ${fmtMin(a.end)}</div>${a.notes ? '<div class="n"></div>' : ""}`;
+        el.innerHTML = `<div class="t"></div><div class="h">${fmtMin(a.start)} – ${fmtMin(a.end)}</div>${a.notes ? '<div class="n"></div>' : ""}${badge}`;
         if (a.notes) el.querySelector(".n").textContent = a.notes;
       }
       el.querySelector(".t").textContent = a.title;
-      el.addEventListener("click", () => openDialog(a));
+      el.addEventListener("click", e => { e.stopPropagation(); openEventMenu(a, dateKey, e); });
       col.appendChild(el);
     });
 
@@ -280,6 +335,157 @@ $("delWeek").addEventListener("click", () => {
   a.skipWeeks = [...new Set([...(a.skipWeeks || []), iso(currentMonday)])];
   save(); dlg.close(); render();
 });
+
+/* ====== Mini-menú al hacer clic en una actividad ====== */
+const menu = $("eventMenu");
+let menuActId = null, menuDateKey = null;
+
+function closeMenu() { menu.hidden = true; menuActId = null; }
+
+function openEventMenu(a, dateKey, ev) {
+  menuActId = a.id;
+  menuDateKey = dateKey;
+  const n = (a.stack || []).length;
+  $("miHabits").querySelector(".count").textContent = n ? `${doneCount(a, dateKey)}/${n}` : "";
+  menu.hidden = false;
+  // Posiciona cerca del clic sin salirse de la pantalla
+  const pad = 8, mw = menu.offsetWidth, mh = menu.offsetHeight;
+  let x = ev.clientX, y = ev.clientY;
+  if (x + mw + pad > innerWidth) x = innerWidth - mw - pad;
+  if (y + mh + pad > innerHeight) y = innerHeight - mh - pad;
+  menu.style.left = Math.max(pad, x) + "px";
+  menu.style.top = Math.max(pad, y) + "px";
+}
+
+document.addEventListener("click", e => {
+  if (!menu.hidden && !menu.contains(e.target)) closeMenu();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenu(); });
+
+$("miHabits").addEventListener("click", () => {
+  const a = state.activities.find(x => x.id === menuActId);
+  const key = menuDateKey;
+  closeMenu();
+  if (a) openStack(a, key);
+});
+$("miEdit").addEventListener("click", () => {
+  const a = state.activities.find(x => x.id === menuActId);
+  closeMenu();
+  if (a) openDialog(a);
+});
+$("miNew").addEventListener("click", () => {
+  const a = state.activities.find(x => x.id === menuActId);
+  const key = menuDateKey;
+  closeMenu();
+  const dayIdx = (parseISO(key).getDay() + 6) % 7;
+  const start = a ? Math.min(a.end, 1410) : 9 * 60;
+  openDialog({ days: [dayIdx], start, end: Math.min(start + 30, 1440) });
+});
+
+/* ====== Panel de hábitos encadenados ====== */
+const stackDlg = $("stackDlg");
+let stackActId = null, stackDateKey = null;
+
+function openStack(a, dateKey) {
+  stackActId = a.id;
+  stackDateKey = dateKey;
+  if (!a.stack) a.stack = [];
+  const d = parseISO(dateKey);
+  $("stackTitle").textContent = a.title;
+  $("stackDate").textContent = d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+  $("stackDur").value = a.stackMinutes || "";
+  $("stackInput").value = "";
+  renderStack();
+  stackDlg.showModal();
+  $("stackInput").focus();
+}
+
+function renderStack() {
+  const a = state.activities.find(x => x.id === stackActId);
+  if (!a) return;
+  const key = stackDateKey;
+  const stack = a.stack || [];
+  const total = stack.length;
+  const done = doneCount(a, key);
+
+  // Progreso + racha + duración
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const streak = streakFor(a, key);
+  $("stackBar").style.width = pct + "%";
+  $("stackCount").textContent = total ? `${done} de ${total} hechos` : "Sin hábitos todavía";
+  $("stackStreak").textContent = streak > 0 ? `🔥 Racha: ${streak} ${streak === 1 ? "día" : "días"}` : "";
+  const dur = a.stackMinutes;
+  $("stackDurLabel").textContent = dur ? `Duración objetivo: ${dur} min` : "";
+
+  // Lista
+  const list = $("stackList");
+  list.innerHTML = "";
+  if (!total) {
+    list.innerHTML = `<p class="empty">Encadena hábitos a <b></b>. Ej: remedios → skincare → lavarse los dientes…</p>`;
+    list.querySelector("b").textContent = a.title;
+    return;
+  }
+  const anchor = document.createElement("p");
+  anchor.className = "anchor";
+  anchor.textContent = "Después de " + a.title + ", haré:";
+  list.appendChild(anchor);
+
+  stack.forEach((h, i) => {
+    const row = document.createElement("div");
+    row.className = "habit" + (isDone(a, key, h.id) ? " done" : "");
+    row.innerHTML = `
+      <input type="checkbox" class="hdone" ${isDone(a, key, h.id) ? "checked" : ""}>
+      <span class="hnum">${i + 1}</span>
+      <span class="hname"></span>
+      <span class="hmove">
+        <button class="up" title="Subir" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="down" title="Bajar" ${i === total - 1 ? "disabled" : ""}>↓</button>
+      </span>
+      <button class="hdel" title="Quitar">×</button>`;
+    row.querySelector(".hname").textContent = h.name;
+    row.querySelector(".hdone").addEventListener("change", e => {
+      toggleDone(key, h.id, e.target.checked);
+      renderStack(); render();
+    });
+    row.querySelector(".up").addEventListener("click", () => moveHabit(i, -1));
+    row.querySelector(".down").addEventListener("click", () => moveHabit(i, 1));
+    row.querySelector(".hdel").addEventListener("click", () => {
+      a.stack.splice(i, 1);
+      save(); renderStack(); render();
+    });
+    list.appendChild(row);
+  });
+}
+
+function moveHabit(i, dir) {
+  const a = state.activities.find(x => x.id === stackActId);
+  const j = i + dir;
+  if (j < 0 || j >= a.stack.length) return;
+  [a.stack[i], a.stack[j]] = [a.stack[j], a.stack[i]];
+  save(); renderStack();
+}
+
+function addHabit() {
+  const a = state.activities.find(x => x.id === stackActId);
+  const name = $("stackInput").value.trim();
+  if (!name) return;
+  if (!a.stack) a.stack = [];
+  a.stack.push({ id: uid(), name });
+  $("stackInput").value = "";
+  save(); renderStack(); render();
+  $("stackInput").focus();
+}
+$("stackAdd").addEventListener("click", addHabit);
+$("stackInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); addHabit(); }
+});
+$("stackDur").addEventListener("change", () => {
+  const a = state.activities.find(x => x.id === stackActId);
+  const v = parseInt($("stackDur").value, 10);
+  a.stackMinutes = v > 0 ? v : null;
+  save(); renderStack();
+});
+$("stackClose").addEventListener("click", () => stackDlg.close());
 
 /* ====== Barra de herramientas ====== */
 $("prevWeek").addEventListener("click", () => { currentMonday = addDays(currentMonday, -7); render(); });

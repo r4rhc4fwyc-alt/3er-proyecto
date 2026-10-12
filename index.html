@@ -45,6 +45,44 @@
     <div id="schedule" class="schedule"></div>
   </main>
 
+  <div id="eventMenu" class="event-menu" hidden>
+    <button id="miHabits"><span class="ico">⛓</span> Hábitos encadenados <span class="count"></span></button>
+    <button id="miEdit"><span class="ico">✏️</span> Modificar actividad</button>
+    <button id="miNew"><span class="ico">➕</span> Nueva actividad</button>
+  </div>
+
+  <dialog id="stackDlg">
+    <div class="stack-head">
+      <h2 id="stackTitle"></h2>
+      <p id="stackDate" class="stack-date"></p>
+    </div>
+
+    <div class="stack-progress">
+      <div class="bar"><div id="stackBar"></div></div>
+      <div class="stack-meta">
+        <span id="stackCount"></span>
+        <span id="stackStreak"></span>
+      </div>
+      <p id="stackDurLabel" class="dur-label"></p>
+    </div>
+
+    <div id="stackList" class="stack-list"></div>
+
+    <div class="stack-add">
+      <input id="stackInput" type="text" maxlength="60" placeholder="Añadir hábito encadenado…" autocomplete="off">
+      <button id="stackAdd" class="primary">Añadir</button>
+    </div>
+
+    <label class="dur-input">Duración total de la rutina (min, opcional)
+      <input id="stackDur" type="number" min="1" max="600" step="1" placeholder="Ej: 45">
+    </label>
+
+    <div class="dlg-actions">
+      <span class="spacer"></span>
+      <button id="stackClose" class="primary">Listo</button>
+    </div>
+  </dialog>
+
   <dialog id="dlg">
     <form method="dialog" id="form">
       <h2 id="dlgTitle">Nueva actividad</h2>
