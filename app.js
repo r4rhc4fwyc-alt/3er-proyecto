@@ -14,7 +14,8 @@ let editingId = null;
 
 function defaultState() {
   // done: { "YYYY-MM-DD": { habitId: true } }  -> hábitos marcados por fecha
-  return { startHour: 6, endHour: 24, activities: [], done: {} };
+  // templates: rutinas reutilizables [{ id, name, habits:[{name}], minutes }]
+  return { startHour: 6, endHour: 24, activities: [], done: {}, templates: [] };
 }
 
 function load() {
@@ -395,6 +396,9 @@ function openStack(a, dateKey) {
   $("stackDate").textContent = d.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
   $("stackDur").value = a.stackMinutes || "";
   $("stackInput").value = "";
+  $("tplNameBar").hidden = true;
+  $("tplMsg").hidden = true;
+  refreshTplSelect();
   renderStack();
   stackDlg.showModal();
   $("stackInput").focus();
@@ -487,7 +491,110 @@ $("stackDur").addEventListener("change", () => {
 });
 $("stackClose").addEventListener("click", () => stackDlg.close());
 
+/* ====== Plantillas de rutina (reutilizables, por copia) ====== */
+function refreshTplSelect() {
+  const sel = $("tplSelect");
+  sel.innerHTML = "";
+  sel.add(new Option("Usar plantilla…", ""));
+  state.templates.forEach(t => sel.add(new Option(`${t.name} (${t.habits.length})`, t.id)));
+}
+
+function showTplMsg(text) {
+  const el = $("tplMsg");
+  el.textContent = text;
+  el.hidden = false;
+  clearTimeout(showTplMsg._t);
+  showTplMsg._t = setTimeout(() => { el.hidden = true; }, 2800);
+}
+
+// Aplicar una plantilla = añadir una COPIA de sus hábitos a la actividad
+$("tplSelect").addEventListener("change", () => {
+  const id = $("tplSelect").value;
+  $("tplSelect").value = "";
+  if (!id) return;
+  const t = state.templates.find(x => x.id === id);
+  const a = state.activities.find(x => x.id === stackActId);
+  if (!t || !a) return;
+  if (!a.stack) a.stack = [];
+  t.habits.forEach(h => a.stack.push({ id: uid(), name: h.name }));
+  if (!a.stackMinutes && t.minutes) { a.stackMinutes = t.minutes; $("stackDur").value = t.minutes; }
+  save(); renderStack(); render();
+  showTplMsg(`Plantilla "${t.name}" añadida (${t.habits.length} hábitos).`);
+});
+
+// Guardar la cadena actual como plantilla
+$("tplSaveBtn").addEventListener("click", () => {
+  const a = state.activities.find(x => x.id === stackActId);
+  if (!a || !(a.stack || []).length) { showTplMsg("No hay hábitos que guardar todavía."); return; }
+  $("tplNameInput").value = a.title || "";
+  $("tplNameBar").hidden = false;
+  $("tplNameInput").focus();
+  $("tplNameInput").select();
+});
+$("tplNameCancel").addEventListener("click", () => { $("tplNameBar").hidden = true; });
+$("tplNameSave").addEventListener("click", () => {
+  const a = state.activities.find(x => x.id === stackActId);
+  const name = $("tplNameInput").value.trim();
+  if (!name) { $("tplNameInput").focus(); return; }
+  state.templates.push({
+    id: uid(),
+    name,
+    habits: (a.stack || []).map(h => ({ name: h.name })),
+    minutes: a.stackMinutes || null,
+  });
+  save();
+  $("tplNameBar").hidden = true;
+  refreshTplSelect();
+  showTplMsg(`Plantilla "${name}" guardada.`);
+});
+$("tplNameInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); $("tplNameSave").click(); }
+});
+
+// Gestor de plantillas (renombrar / borrar)
+function renderTplManager() {
+  const list = $("tplList");
+  list.innerHTML = "";
+  if (!state.templates.length) {
+    list.innerHTML = `<p class="muted-text">Aún no tienes plantillas. Crea una desde cualquier actividad: ábrela → "Hábitos encadenados" → "Guardar como plantilla".</p>`;
+    return;
+  }
+  state.templates.forEach(t => {
+    const row = document.createElement("div");
+    row.className = "tpl-row";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = t.name;
+    input.maxLength = 40;
+    input.addEventListener("change", () => {
+      const v = input.value.trim();
+      if (v) { t.name = v; save(); refreshTplSelect(); } else input.value = t.name;
+    });
+
+    const info = document.createElement("span");
+    info.className = "tpl-info";
+    info.textContent = `${t.habits.length} háb.${t.minutes ? " · " + t.minutes + "m" : ""}`;
+
+    const del = document.createElement("button");
+    del.className = "danger";
+    del.textContent = "Borrar";
+    let armed = false;
+    del.addEventListener("click", () => {
+      if (!armed) { armed = true; del.textContent = "¿Seguro?"; setTimeout(() => { armed = false; del.textContent = "Borrar"; }, 2500); return; }
+      state.templates = state.templates.filter(x => x.id !== t.id);
+      save(); renderTplManager(); refreshTplSelect();
+    });
+
+    row.append(input, info, del);
+    list.appendChild(row);
+  });
+}
+$("tplManageBtn").addEventListener("click", () => { closeMore(); renderTplManager(); $("tplDlg").showModal(); });
+$("tplDlgClose").addEventListener("click", () => $("tplDlg").close());
+
 /* ====== Barra de herramientas ====== */
+function closeMore() { const m = document.querySelector(".more"); if (m) m.open = false; }
 $("prevWeek").addEventListener("click", () => { currentMonday = addDays(currentMonday, -7); render(); });
 $("nextWeek").addEventListener("click", () => { currentMonday = addDays(currentMonday, 7); render(); });
 $("today").addEventListener("click", () => { currentMonday = mondayOf(new Date()); render(); });
@@ -525,15 +632,40 @@ $("startHour").addEventListener("change", onRangeChange);
 $("endHour").addEventListener("change", onRangeChange);
 
 /* Exportar / importar / imprimir */
+function flash(btn, text) {
+  const prev = btn.textContent;
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = prev; }, 1600);
+}
 $("exportBtn").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `planificacion-${iso(new Date())}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  closeMore();
+  $("exportText").value = JSON.stringify(state, null, 2);
+  $("exportDlg").showModal();
 });
-$("importBtn").addEventListener("click", () => $("importFile").click());
+$("exportCopy").addEventListener("click", async () => {
+  const ta = $("exportText");
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    flash($("exportCopy"), "¡Copiado!");
+  } catch (e) {
+    ta.focus(); ta.select();
+    try { document.execCommand("copy"); flash($("exportCopy"), "¡Copiado!"); }
+    catch (e2) { flash($("exportCopy"), "Selecciona y copia"); }
+  }
+});
+$("exportDownload").addEventListener("click", () => {
+  const blob = new Blob([$("exportText").value], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `planificacion-${iso(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000); // revoca tarde para no cancelar la descarga
+});
+$("exportCloseBtn").addEventListener("click", () => $("exportDlg").close());
+$("importBtn").addEventListener("click", () => { closeMore(); $("importFile").click(); });
 $("importFile").addEventListener("change", async e => {
   const f = e.target.files[0];
   e.target.value = "";
@@ -548,7 +680,12 @@ $("importFile").addEventListener("change", async e => {
     alert("El archivo no es una copia válida.");
   }
 });
-$("printBtn").addEventListener("click", () => window.print());
+$("printBtn").addEventListener("click", () => {
+  closeMore();
+  // En la vista previa embebida la impresión puede estar bloqueada por el sandbox;
+  // funciona al abrir el archivo real. Como respaldo, se puede usar Ctrl/Cmd+P.
+  try { window.print(); } catch (e) { alert("Si no se abre el diálogo de impresión aquí, usa Ctrl/Cmd+P o abre el archivo directamente."); }
+});
 
 /* Actualiza la línea de "ahora" cada minuto */
 setInterval(() => { if (!dlg.open) render(); }, 60000);

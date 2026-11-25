@@ -26,6 +26,7 @@
           <label>Hora final
             <select id="endHour"></select>
           </label>
+          <button id="tplManageBtn">Plantillas de rutina</button>
           <button id="exportBtn">Exportar copia (JSON)</button>
           <button id="importBtn">Importar copia</button>
           <button id="printBtn">Imprimir</button>
@@ -73,6 +74,17 @@
       <button id="stackAdd" class="primary">Añadir</button>
     </div>
 
+    <div class="stack-templates">
+      <select id="tplSelect"></select>
+      <button id="tplSaveBtn" type="button">Guardar como plantilla</button>
+    </div>
+    <div id="tplNameBar" class="tpl-name-bar" hidden>
+      <input id="tplNameInput" type="text" maxlength="40" placeholder="Nombre de la plantilla" autocomplete="off">
+      <button id="tplNameSave" class="primary" type="button">Guardar</button>
+      <button id="tplNameCancel" type="button">Cancelar</button>
+    </div>
+    <p id="tplMsg" class="tpl-msg" hidden></p>
+
     <label class="dur-input">Duración total de la rutina (min, opcional)
       <input id="stackDur" type="number" min="1" max="600" step="1" placeholder="Ej: 45">
     </label>
@@ -80,6 +92,28 @@
     <div class="dlg-actions">
       <span class="spacer"></span>
       <button id="stackClose" class="primary">Listo</button>
+    </div>
+  </dialog>
+
+  <dialog id="exportDlg">
+    <h2>Copia de seguridad</h2>
+    <p class="muted-text">Copia este texto y guárdalo en un lugar seguro, o descárgalo como archivo. Para restaurarlo usa el botón "Importar copia".</p>
+    <textarea id="exportText" rows="8" readonly></textarea>
+    <div class="dlg-actions">
+      <button id="exportCopy" type="button">Copiar</button>
+      <button id="exportDownload" type="button">Descargar .json</button>
+      <span class="spacer"></span>
+      <button id="exportCloseBtn" class="primary" type="button">Cerrar</button>
+    </div>
+  </dialog>
+
+  <dialog id="tplDlg">
+    <h2>Plantillas de rutina</h2>
+    <p class="muted-text">Rutinas guardadas que puedes reutilizar en cualquier actividad: ábrela, elige "Hábitos encadenados" y luego "Usar plantilla".</p>
+    <div id="tplList" class="tpl-list"></div>
+    <div class="dlg-actions">
+      <span class="spacer"></span>
+      <button id="tplDlgClose" class="primary" type="button">Cerrar</button>
     </div>
   </dialog>
 
